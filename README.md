@@ -88,43 +88,36 @@ Track your interview performance with:
 
 # 🖥 Screenshots
 
-## Dashboard
-
-> Add screenshot here
+## 🏠 Dashboard
 
 ```
-screenshots/dashboard.png
-```
 
----
-
-## Resume Analysis
-
-> Add screenshot here
-
-```
-screenshots/resume-analysis.png
+![Dashboard](screenshots/dashboard.png)
 ```
 
 ---
 
-## Interview
-
-> Add screenshot here
+## 📄 Resume Analysis
 
 ```
-screenshots/interview.png
+![Resume Analysis](screenshots/resume-analysis.png)
 ```
 
 ---
 
-## Report
-
-> Add screenshot here
+## 🎤 Interview
 
 ```
-screenshots/report.png
-screenshots/report_2.png
+![Interview](screenshots/interview.png)
+```
+
+---
+
+## 📊 Report
+
+```
+![Report](screenshots/report.png)
+![Report2](screenshots/report_2.png)
 ```
 
 ---

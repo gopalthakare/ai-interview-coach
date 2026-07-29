@@ -90,35 +90,26 @@ Track your interview performance with:
 
 ## 🏠 Dashboard
 
-```
-
 ![Dashboard](screenshots/dashboard.png)
-```
 
 ---
 
 ## 📄 Resume Analysis
 
-```
 ![Resume Analysis](screenshots/resume-analysis.png)
-```
 
 ---
 
 ## 🎤 Interview
 
-```
 ![Interview](screenshots/interview.png)
-```
 
 ---
 
 ## 📊 Report
 
-```
 ![Report](screenshots/report.png)
 ![Report2](screenshots/report_2.png)
-```
 
 ---
 

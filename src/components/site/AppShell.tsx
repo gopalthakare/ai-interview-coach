@@ -53,7 +53,7 @@ export function AppShell() {
         <Link to="/dashboard" className="flex items-center gap-2.5 px-6 h-16 border-b border-sidebar-border">
           <Logomark />
           <span className="font-semibold tracking-tight">
-            AI <span className="text-primary">Coach</span>
+            Prep<span className="text-primary">Pundit</span>
           </span>
         </Link>
         <nav className="p-4 flex-1 space-y-1">

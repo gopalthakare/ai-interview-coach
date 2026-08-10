@@ -11,6 +11,18 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 from ..prompts import REPORT_PROMPT
 from .ai_provider import complete_json
+from .matcher import match_resume_to_jd
+
+
+def _resume_match_for(interview) -> float:
+    if not (interview.resume and interview.job):
+        return 0.0
+    result = match_resume_to_jd(
+        resume_skills=interview.resume.skills or [],
+        required=interview.job.required_skills or [],
+        preferred=interview.job.preferred_skills or [],
+    )
+    return float(result["percentage"])
 
 
 def build_report(db, interview) -> dict[str, Any]:
@@ -55,7 +67,7 @@ def build_report(db, interview) -> dict[str, Any]:
             "overall_score": 0,
             "technical_score": 0,
             "communication_score": 0,
-            "resume_match": 0.0,
+            "resume_match": _resume_match_for(interview),
 
             "strengths": [],
             "weaknesses": [
@@ -108,7 +120,7 @@ def build_report(db, interview) -> dict[str, Any]:
         "overall_score": over_s,
         "technical_score": tech_s,
         "communication_score": comm_s,
-        "resume_match": 0.0,
+        "resume_match": _resume_match_for(interview),
 
         "strengths": strengths[:8],
         "weaknesses": weaknesses[:8],

@@ -112,7 +112,7 @@ class GeminiProvider(AIProvider):
 class MockProvider(AIProvider):
     def complete(self, prompt: str, *, json_mode: bool = False) -> str:
         p = prompt.lower()
-        if "resume parsing" in p or "resume text" in p:
+        if "ats resume parser" in p or "extract information from the resume" in p:
             return json.dumps({
                 "skills": ["Python", "FastAPI", "SQL", "React", "TypeScript", "Docker", "AWS"],
                 "education": [{"degree": "B.S. Computer Science", "institution": "State University", "year": "2021"}],
@@ -161,28 +161,37 @@ class MockProvider(AIProvider):
         return "Tell me about a challenging problem you solved recently."
 
 
-_provider: AIProvider | None = None
-
-
 def get_provider() -> AIProvider:
+    """Return the primary provider for the configured AI_PROVIDER setting."""
     p = settings.AI_PROVIDER.lower()
 
     if p == "gemini":
         return GeminiProvider()
-
     if p == "groq":
         return GroqProvider()
-
     if p == "openai":
         return OpenAIProvider()
-
     return MockProvider()
 
 
-def complete_json(prompt: str) -> dict:
-    providers = [GeminiProvider(), GroqProvider()]
+def _provider_chain() -> list[AIProvider]:
+    """Providers to try in order, based on AI_PROVIDER. Mock is a deliberate
+    dead end (no network fallback) so local/demo mode never makes live calls;
+    every other setting falls back to Gemini/Groq so a rate limit or outage
+    on the primary provider doesn't take the feature down entirely."""
+    p = settings.AI_PROVIDER.lower()
 
-    for provider in providers:
+    if p == "mock":
+        return [MockProvider()]
+    if p == "openai":
+        return [OpenAIProvider(), GeminiProvider(), GroqProvider()]
+    if p == "groq":
+        return [GroqProvider(), GeminiProvider()]
+    return [GeminiProvider(), GroqProvider()]  # default: gemini
+
+
+def complete_json(prompt: str) -> dict:
+    for provider in _provider_chain():
         try:
             logger.info("Using %s", provider.__class__.__name__)
             return _extract_json(provider.complete(prompt, json_mode=True))
@@ -193,9 +202,7 @@ def complete_json(prompt: str) -> dict:
 
 
 def complete_text(prompt: str) -> str:
-    providers = [GeminiProvider(), GroqProvider()]
-
-    for provider in providers:
+    for provider in _provider_chain():
         try:
             logger.info("Using %s", provider.__class__.__name__)
             return provider.complete(prompt).strip()

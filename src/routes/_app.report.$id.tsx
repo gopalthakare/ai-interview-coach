@@ -22,7 +22,7 @@ interface Report {
 }
 
 export const Route = createFileRoute("/_app/report/$id")({
-  head: () => ({ meta: [{ title: "Interview Report — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "Interview Report — PrepPundit" }] }),
   component: ReportPage,
 });
 

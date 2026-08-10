@@ -1,9 +1,10 @@
 # Python
-__pycache__/
+**pycache**/
 *.py[cod]
 .venv/
 venv/
-backend/uploads/*
+backend/uploads/
+backend/*.db
 
 # Environment variables
 .env

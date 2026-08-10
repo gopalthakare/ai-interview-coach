@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
 from ..security import get_current_user
-from ..services.matcher import match_resume_to_jd
 
 from fastapi import HTTPException
 
@@ -21,12 +20,7 @@ def list_history(db: Session = Depends(get_db), user: models.User = Depends(get_
     items: list[schemas.HistoryItem] = []
     for iv in interviews:
         score = int(iv.report.overall_score) if iv.report else 0
-        match = 0
-        if iv.resume_id and iv.job_id:
-            resume = db.query(models.Resume).get(iv.resume_id)
-            job = db.query(models.JobDescription).get(iv.job_id)
-            if resume and job:
-                match = match_resume_to_jd(resume.skills or [], job.required_skills or [], job.preferred_skills or [])["percentage"]
+        match = int(iv.report.resume_match) if iv.report else 0
         items.append(schemas.HistoryItem(
             id=iv.report.id if iv.report else iv.id, role=iv.role or "General",
             date=iv.started_at.strftime("%b %d, %Y"),

@@ -34,7 +34,7 @@ interface DashboardData {
 }
 
 export const Route = createFileRoute("/_app/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — PrepPundit" }] }),
   component: Dashboard,
 });
 

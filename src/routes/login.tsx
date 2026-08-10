@@ -9,7 +9,7 @@ import { useAuth } from "../lib/auth";
 import { Logomark } from "../components/site/Logomark";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "Sign in — PrepPundit" }] }),
   component: LoginPage,
 });
 
@@ -39,7 +39,7 @@ function LoginPage() {
       <div className="w-full max-w-md">
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
           <Logomark />
-          <span className="font-semibold text-lg">AI Interview Coach</span>
+          <span className="font-semibold text-lg">PrepPundit</span>
         </Link>
         <Card className="card-flat p-8">
           <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>

@@ -16,7 +16,7 @@ interface HistoryItem {
 }
 
 export const Route = createFileRoute("/_app/history")({
-  head: () => ({ meta: [{ title: "History — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "History — PrepPundit" }] }),
   component: HistoryPage,
 });
 

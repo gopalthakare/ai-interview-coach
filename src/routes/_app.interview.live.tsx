@@ -2,13 +2,28 @@ import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Mic, MicOff, Camera, StopCircle, ArrowRight, Timer } from "lucide-react";
+import {
+  Mic,
+  MicOff,
+  Camera,
+  StopCircle,
+  ArrowRight,
+  Timer,
+  Eye,
+  EyeOff,
+  Smartphone,
+  UserX,
+  ShieldCheck,
+  Loader2,
+  ExternalLink,
+} from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { api } from "../lib/api";
+import { useProctoring, type ProctoringViolationType } from "../hooks/use-proctoring";
 
 interface Question {
   id: number;
@@ -19,7 +34,7 @@ interface Question {
 }
 
 export const Route = createFileRoute("/_app/interview/live")({
-  head: () => ({ meta: [{ title: "Live Interview — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "Live Interview — PrepPundit" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
     id: (s.id as string) ?? "demo",
     type: (s.type as string) ?? "technical",
@@ -52,26 +67,45 @@ function LivePage() {
   const [micOn, setMicOn] = useState(false);
   const recogRef = useRef<any>(null);
   const endingRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   useEffect(() => {
     // Initial question
     if (isDemo) {
-      setQuestion({ id: 0, text: DEMO_QUESTIONS[0], index: 0, total, difficulty: search.difficulty });
+      setQuestion({
+        id: 0,
+        text: DEMO_QUESTIONS[0],
+        index: 0,
+        total,
+        difficulty: search.difficulty,
+      });
     } else {
       api<Question>("/interview/question", { body: { interview_id: Number(search.id) } })
         .then(setQuestion)
         .catch(() => {
-          setQuestion({ id: 0, text: DEMO_QUESTIONS[0], index: 0, total, difficulty: search.difficulty });
+          setQuestion({
+            id: 0,
+            text: DEMO_QUESTIONS[0],
+            index: 0,
+            total,
+            difficulty: search.difficulty,
+          });
         });
     }
     // Camera preview
     if (navigator.mediaDevices?.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: false })
         .then((stream) => {
-          const v = document.getElementById("camera-preview") as HTMLVideoElement | null;
-          if (v) v.srcObject = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            setCameraReady(true);
+          }
         })
-        .catch(() => {});
+        .catch(() => {
+          toast.error("Couldn't access your camera — check browser permissions.");
+        });
     }
   }, [isDemo, search.id, search.difficulty]);
 
@@ -82,9 +116,22 @@ function LivePage() {
 
   useEffect(() => {
     if (remaining === 0 && !endingRef.current) {
-    endInterview();}
+      endInterview();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining]);
+
+  const proctoring = useProctoring(videoRef.current, cameraReady && !endingRef.current);
+  const lastViolationCountRef = useRef(0);
+
+  useEffect(() => {
+    const newOnes = proctoring.violations.slice(lastViolationCountRef.current);
+    lastViolationCountRef.current = proctoring.violations.length;
+    const tabSwitch = newOnes.find((v) => v.type === "tab_switched");
+    if (tabSwitch) {
+      toast.warning("You switched away from the interview tab. This has been logged.");
+    }
+  }, [proctoring.violations]);
 
   const answerMut = useMutation({
     mutationFn: (payload: { interview_id: number; question_id: number; answer: string }) =>
@@ -96,17 +143,34 @@ function LivePage() {
       api<{ report_id: number }>("/interview/end", { body: payload }),
   });
 
-  function toggleMic() {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) {
-      toast.error("Speech recognition not supported in this browser");
-      return;
-    }
+  async function toggleMic() {
     if (micOn) {
       recogRef.current?.stop();
       setMicOn(false);
       return;
     }
+
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) {
+      toast.error("Voice input isn't supported in this browser — try Chrome or Edge.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      toast.error("Voice input needs a secure connection (HTTPS or localhost).");
+      return;
+    }
+
+    // Request mic permission explicitly first. SpeechRecognition can request
+    // its own permission, but doing it this way surfaces a clear error if
+    // it's blocked instead of the recognizer just silently ending.
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      toast.error("Microphone access is blocked — allow it in your browser's site settings.");
+      return;
+    }
+
     const recog = new SR();
     recog.continuous = true;
     recog.interimResults = true;
@@ -116,7 +180,18 @@ function LivePage() {
       for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
       setAnswer(text);
     };
-    recog.onerror = () => setMicOn(false);
+    recog.onerror = (e: { error?: string }) => {
+      setMicOn(false);
+      const messages: Record<string, string> = {
+        "not-allowed": "Microphone access was denied.",
+        "no-speech": "No speech detected — mic stopped listening.",
+        "audio-capture": "No microphone was found.",
+        network: "Voice recognition lost its network connection.",
+      };
+      if (e?.error && e.error !== "aborted") {
+        toast.error(messages[e.error] ?? `Voice input stopped (${e.error}).`);
+      }
+    };
     recog.onend = () => setMicOn(false);
     recog.start();
     recogRef.current = recog;
@@ -134,7 +209,13 @@ function LivePage() {
     }
 
     if (isDemo) {
-      setQuestion({ id: nextIdx, text: DEMO_QUESTIONS[nextIdx], index: nextIdx, total, difficulty: search.difficulty });
+      setQuestion({
+        id: nextIdx,
+        text: DEMO_QUESTIONS[nextIdx],
+        index: nextIdx,
+        total,
+        difficulty: search.difficulty,
+      });
     } else {
       try {
         const q = await answerMut.mutateAsync({
@@ -144,48 +225,54 @@ function LivePage() {
         });
         setQuestion(q);
       } catch {
-        setQuestion({ id: nextIdx, text: DEMO_QUESTIONS[nextIdx], index: nextIdx, total, difficulty: search.difficulty });
+        setQuestion({
+          id: nextIdx,
+          text: DEMO_QUESTIONS[nextIdx],
+          index: nextIdx,
+          total,
+          difficulty: search.difficulty,
+        });
       }
     }
     setIndex(nextIdx);
     setAnswer("");
   }
 
-async function endInterview() {
-  if (endingRef.current) return;
+  async function endInterview() {
+    if (endingRef.current) return;
 
-  endingRef.current = true;
+    endingRef.current = true;
 
-  recogRef.current?.stop?.();
+    recogRef.current?.stop?.();
 
-  if (isDemo) {
-    navigate({
-      to: "/report/$id",
-      params: { id: "demo" },
-    });
-    return;
+    if (isDemo) {
+      navigate({
+        to: "/report/$id",
+        params: { id: "demo" },
+      });
+      return;
+    }
+
+    try {
+      const r = await endMut.mutateAsync({
+        interview_id: Number(search.id),
+      });
+
+      navigate({
+        to: "/report/$id",
+        params: {
+          id: String(r.report_id),
+        },
+      });
+    } catch {
+      navigate({
+        to: "/report/$id",
+        params: {
+          id: "demo",
+        },
+      });
+    }
   }
-
-  try {
-    const r = await endMut.mutateAsync({
-      interview_id: Number(search.id),
-    });
-
-    navigate({
-      to: "/report/$id",
-      params: {
-        id: String(r.report_id),
-      },
-    });
-  } catch {
-    navigate({
-      to: "/report/$id",
-      params: {
-        id: "demo",
-      },
-    });
-  }
-}
 
   const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
   const ss = String(remaining % 60).padStart(2, "0");
@@ -195,14 +282,18 @@ async function endInterview() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <Badge variant="outline" className="border-primary/40 text-primary capitalize">{search.type}</Badge>
+          <Badge variant="outline" className="border-primary/40 text-primary capitalize">
+            {search.type}
+          </Badge>
           <span className="ml-2 text-sm text-muted-foreground">
             Question {index + 1} of {total}
           </span>
         </div>
         <div className="flex items-center gap-2 card-flat px-3 py-1.5 rounded-lg border border-border">
           <Timer className="h-4 w-4 text-primary" />
-          <span className="tabular-nums font-mono">{mm}:{ss}</span>
+          <span className="tabular-nums font-mono">
+            {mm}:{ss}
+          </span>
         </div>
       </div>
       <Progress value={progress} className="h-1.5" />
@@ -210,7 +301,9 @@ async function endInterview() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-4">
           <Card className="card-flat p-8 min-h-40">
-            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Interviewer</div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
+              Interviewer
+            </div>
             <p className="text-xl leading-relaxed">{question?.text ?? "Loading…"}</p>
           </Card>
           <Card className="card-flat p-6">
@@ -233,12 +326,18 @@ async function endInterview() {
               className="min-h-40 bg-muted border-border"
             />
             <div className="mt-4 flex justify-between">
-              <Button variant="outline" onClick={endInterview} disabled={endingRef.current || endMut.isPending}>
+              <Button
+                variant="outline"
+                onClick={endInterview}
+                disabled={endingRef.current || endMut.isPending}
+              >
                 <StopCircle className="h-4 w-4" /> End interview
               </Button>
               <Button
                 onClick={nextQuestion}
-                disabled={!answer.trim() || answerMut.isPending || endMut.isPending || endingRef.current}
+                disabled={
+                  !answer.trim() || answerMut.isPending || endMut.isPending || endingRef.current
+                }
                 className="bg-primary text-primary-foreground border-0"
               >
                 {index + 1 >= total ? "Finish" : "Next question"}
@@ -254,11 +353,15 @@ async function endInterview() {
               <Camera className="h-4 w-4 text-primary" /> Camera preview
             </div>
             <div className="aspect-video rounded-lg overflow-hidden bg-black/40 border border-border grid place-items-center">
-              <video id="camera-preview" autoPlay playsInline muted className="w-full h-full object-cover" />
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover"
+              />
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Behavior analytics only — not cheating detection.
-            </p>
+            <ProctoringPanel proctoring={proctoring} />
           </Card>
           <Card className="card-flat p-4">
             <div className="text-sm font-medium mb-2">Transcript</div>
@@ -276,6 +379,100 @@ async function endInterview() {
           </Card>
         </div>
       </div>
+    </div>
+  );
+}
+
+const VIOLATION_META: Record<ProctoringViolationType, { label: string; icon: typeof Eye }> = {
+  no_face: { label: "No face detected", icon: UserX },
+  multiple_faces: { label: "Multiple faces detected", icon: UserX },
+  looking_away: { label: "Looked away", icon: EyeOff },
+  phone_detected: { label: "Phone detected", icon: Smartphone },
+  tab_switched: { label: "Switched tabs", icon: ExternalLink },
+};
+
+function ProctoringPanel({ proctoring }: { proctoring: ReturnType<typeof useProctoring> }) {
+  if (!proctoring.supported) {
+    return (
+      <p className="mt-2 text-xs text-muted-foreground">
+        Activity detection isn't available in this browser — voice and text answers still work fine.
+      </p>
+    );
+  }
+
+  if (proctoring.loading || !proctoring.ready) {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> Loading activity detection…
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        <Badge
+          variant="outline"
+          className={
+            proctoring.faceDetected
+              ? "border-emerald-500/40 text-emerald-500"
+              : "border-destructive/40 text-destructive"
+          }
+        >
+          {proctoring.faceDetected ? <Eye className="h-3 w-3" /> : <UserX className="h-3 w-3" />}
+          {proctoring.faceDetected ? "Face detected" : "No face"}
+        </Badge>
+        {proctoring.lookingAway && (
+          <Badge variant="outline" className="border-amber-500/40 text-amber-500">
+            <EyeOff className="h-3 w-3" /> Looking away
+          </Badge>
+        )}
+        {proctoring.phoneDetected && (
+          <Badge variant="outline" className="border-destructive/40 text-destructive">
+            <Smartphone className="h-3 w-3" /> Phone detected
+          </Badge>
+        )}
+        {proctoring.tabSwitchCount > 0 && (
+          <Badge variant="outline" className="border-amber-500/40 text-amber-500">
+            <ExternalLink className="h-3 w-3" /> Tab switches: {proctoring.tabSwitchCount}
+          </Badge>
+        )}
+        {proctoring.faceDetected &&
+          !proctoring.lookingAway &&
+          !proctoring.phoneDetected &&
+          proctoring.tabSwitchCount === 0 && (
+            <Badge variant="outline" className="border-emerald-500/40 text-emerald-500">
+              <ShieldCheck className="h-3 w-3" /> All clear
+            </Badge>
+          )}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Runs on-device — your video is never uploaded or sent to a server.
+      </p>
+      {proctoring.violations.length > 0 && (
+        <div className="space-y-1 max-h-32 overflow-y-auto text-xs border-t border-border pt-2">
+          {proctoring.violations
+            .slice()
+            .reverse()
+            .map((v, i) => {
+              const meta = VIOLATION_META[v.type];
+              const Icon = meta.icon;
+              return (
+                <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
+                  <Icon className="h-3 w-3 shrink-0" />
+                  <span>{meta.label}</span>
+                  <span className="ml-auto tabular-nums">
+                    {new Date(v.timestamp).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </span>
+                </div>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }

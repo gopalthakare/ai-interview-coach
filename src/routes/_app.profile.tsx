@@ -4,7 +4,7 @@ import { Badge } from "../components/ui/badge";
 import { useAuth } from "../lib/auth";
 
 export const Route = createFileRoute("/_app/profile")({
-  head: () => ({ meta: [{ title: "Profile — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "Profile — PrepPundit" }] }),
   component: ProfilePage,
 });
 

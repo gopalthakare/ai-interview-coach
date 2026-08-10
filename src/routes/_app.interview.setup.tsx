@@ -9,7 +9,7 @@ import { cn } from "../lib/utils";
 import { api } from "../lib/api";
 
 export const Route = createFileRoute("/_app/interview/setup")({
-  head: () => ({ meta: [{ title: "New Interview — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "New Interview — PrepPundit" }] }),
   component: SetupPage,
 });
 

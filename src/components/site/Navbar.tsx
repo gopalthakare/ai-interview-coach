@@ -12,7 +12,7 @@ export function Navbar() {
         <Link to="/" className="flex items-center gap-2.5">
           <Logomark />
           <span className="font-semibold tracking-tight">
-            AI Interview <span className="text-primary">Coach</span>
+            Prep<span className="text-primary">Pundit</span>
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">

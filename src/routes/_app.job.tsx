@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { FileSearch, Code2, Brain, Cpu, LineChart, Coffee, Layout, Server, Layers } from "lucide-react";
 import { Card } from "../components/ui/card";
@@ -24,6 +24,35 @@ interface JobAnalysis {
   };
 }
 
+// The route component unmounts every time you navigate to another page and
+// back (normal SPA behavior), which was wiping the in-progress JD draft and
+// analysis result. Persisting to localStorage survives that, plus logging
+// out and fully closing/reopening the browser — unlike sessionStorage, this
+// isn't cleared until the user clears it (or submits a new analysis).
+const JD_STORAGE_KEY = "preppundit:jd-draft";
+const JD_RESULT_KEY = "preppundit:jd-result";
+const JD_TAB_KEY = "preppundit:jd-tab";
+
+function readStore(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStore(key: string, value: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
+  } catch {
+    // localStorage can throw in private-browsing / storage-full edge
+    // cases — losing the draft-persistence nicety isn't worth crashing over.
+  }
+}
+
 const PRESETS = [
   { label: "Python Developer", icon: Code2 },
   { label: "AI Engineer", icon: Brain },
@@ -36,14 +65,27 @@ const PRESETS = [
 ];
 
 export const Route = createFileRoute("/_app/job")({
-  head: () => ({ meta: [{ title: "Job Description — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "Job Description — PrepPundit" }] }),
   component: JobPage,
 });
 
 function JobPage() {
   const qc = useQueryClient();
-  const [jd, setJd] = useState("");
-  const [result, setResult] = useState<JobAnalysis | null>(null);
+  const [jd, setJd] = useState(() => readStore(JD_STORAGE_KEY) ?? "");
+  const [result, setResult] = useState<JobAnalysis | null>(() => {
+    const raw = readStore(JD_RESULT_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as JobAnalysis;
+    } catch {
+      return null;
+    }
+  });
+  const [tab, setTab] = useState(() => readStore(JD_TAB_KEY) ?? "paste");
+
+  useEffect(() => writeStore(JD_STORAGE_KEY, jd || null), [jd]);
+  useEffect(() => writeStore(JD_RESULT_KEY, result ? JSON.stringify(result) : null), [result]);
+  useEffect(() => writeStore(JD_TAB_KEY, tab), [tab]);
 
   const analyze = useMutation({
     mutationFn: (payload: { text?: string; preset?: string }) =>
@@ -66,7 +108,7 @@ function JobPage() {
       </div>
 
       <Card className="card-flat p-6">
-        <Tabs defaultValue="paste">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="bg-muted">
             <TabsTrigger value="paste">Paste JD</TabsTrigger>
             <TabsTrigger value="preset">Predefined role</TabsTrigger>
@@ -80,7 +122,7 @@ function JobPage() {
             />
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                We'll pull out required skills, seniority, and keywords, then match them against your resume.
+                Analyze the job description and compare it with your resume.
               </p>
               <Button
                 disabled={!jd.trim() || analyze.isPending}

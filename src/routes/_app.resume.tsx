@@ -20,7 +20,7 @@ interface Resume {
 }
 
 export const Route = createFileRoute("/_app/resume")({
-  head: () => ({ meta: [{ title: "Resume — AI Interview Coach" }] }),
+  head: () => ({ meta: [{ title: "Resume — PrepPundit" }] }),
   component: ResumePage,
 });
 

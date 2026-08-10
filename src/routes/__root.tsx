@@ -76,14 +76,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AI Interview Coach — Land your next role" },
+      { title: "PrepPundit - Land your next role" },
       {
         name: "description",
         content:
           "Practice real technical, HR, and behavioral interviews with an adaptive AI coach. Get scored feedback, resume-JD match, and a personalized learning roadmap.",
       },
-      { name: "author", content: "AI Interview Coach" },
-      { property: "og:title", content: "AI Interview Coach" },
+      { name: "author", content: "PrepPundit" },
+      { property: "og:title", content: "PrepPundit" },
       {
         property: "og:description",
         content:
